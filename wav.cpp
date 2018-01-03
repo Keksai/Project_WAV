@@ -1,11 +1,13 @@
 #include "wav.h"
+#include <QtMath>
 
 
 WAV::WAV() {}
 
-WAV::WAV(const QString fileName, const QString fileToSave)
+WAV::WAV(const QString fileName, qint8 r)
 {
-    readWAV(fileName, fileToSave);
+    this->r = r;
+    readWAV(fileName, r);
 }
 
 void WAV::entropia() {
@@ -48,7 +50,7 @@ void WAV::entropia() {
     }
 }
 
-void WAV::readWAV(const QString fileName, const QString fileToSave)
+void WAV::readWAV(const QString fileName, qint8 r)
 {
     if (fileName != "") {
         QFile wavFile(fileName);
@@ -123,15 +125,7 @@ void WAV::readWAV(const QString fileName, const QString fileToSave)
 
         //Reading data from the file
         samples = 0;
-        QFile saveFile(fileToSave);
-        saveFile.open(QIODevice::WriteOnly);
 
-
-
-        if (wavHeader.numChannels == 2)
-        {
-            saveFile.write("L\t R\r\n");
-        }
         int a = 0;
         while (wavFile.read(buff, 0x04) > 0)
         {
@@ -162,10 +156,11 @@ void WAV::readWAV(const QString fileName, const QString fileToSave)
             // podzial kanalow wplywa na umeiszczenie
             switch (wavHeader.numChannels) {
             case 1:
-                saveFile.write(QString("%1\r\n %2\r\n").arg(sampleChannel1).arg(sampleChannel2).toUtf8());
+                LeftSamples.append(sampleChannel1);
                 break;
             case 2:
-                saveFile.write(QString("%1\t %2\r\n").arg(sampleChannel1).arg(sampleChannel2).toUtf8());
+                LeftSamples.append(sampleChannel1);
+                RightSamples.append(sampleChannel2);
                 break;
             }
             // check the end of the file
@@ -205,10 +200,40 @@ void WAV::readWAV(const QString fileName, const QString fileToSave)
         //write();
 
         wavFile.close();
-        if (saveFile.isOpen())
-        {
-            saveFile.close();
+    }
+}
+
+
+QVector<double> WAV::predictCoder(QVector<int16_t>canal, QVector<double>vectorEPS) {
+    qreal sumPredict = 0;
+    QVector <double> counters;
+    QVector <double> predictValue;
+    //vector <int> vectorEPSint(vectorEPS.begin(), vectorEPS.end());
+
+    for (size_t i = 0; i < samples / 2; i++) {
+        sumPredict = 0;
+        if (i == 0)
+            predictValue.append(canal.at(i));
+        else if (i < r)
+            predictValue.append(canal.at(i - 1));
+        else {
+            for (size_t j = 1; j <= r; j++)
+                sumPredict += vectorEPS.at(j - 1) * canal.at(i - j);
+            if (sumPredict > 32768 - 1)
+                sumPredict = 32768 - 1;
+            else if (sumPredict < -32768)
+                sumPredict = -32768;
+            predictValue.append(qFloor(sumPredict + 0.5));
         }
     }
+
+    for (int i = 0; i < samples / 2; i++) {
+        if(i == 0)
+            counters.append(canal.at(i));
+        else
+            counters.append(canal.at(i) - predictValue.at(i));
+    }
+
+    return counters;
 }
 

@@ -28,9 +28,10 @@ class WAV
 {
 public:
     WAV();
-    WAV(const QString fileName, const QString fileToSave);
+    WAV(const QString fileName, qint8 r);
 
-    void readWAV(const QString fileName, const QString fileToSave);
+    void readWAV(const QString fileName, qint8 r);
+    QVector<double> predictCoder(QVector<int16_t> canal, QVector<double> vectorEPS);
     void entropia();
 
 
@@ -52,6 +53,11 @@ public:
     double probabilitiesMinusright[65536];
 
     wav_header_t wavHeader;
+
+    QVector<int> LeftSamples;
+    QVector<int> RightSamples;
+
+    qint8 r;
 };
 
 #endif // WAV_H

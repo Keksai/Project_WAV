@@ -41,6 +41,6 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-    WAV file("ATrain.wav", "list.dat");
+    WAV file("ATrain.wav", 3);
         return a.exec();
 }
