@@ -17,6 +17,8 @@ WAV::WAV(const QString fileName, qint8 r)
     qDebug() << "Av signal energy: " << d; // pierwsze obliczenia
     minus_vectors();
 
+    decode(LeftSamples);
+
 }
 
 void WAV::entropia() {
@@ -226,7 +228,7 @@ double WAV::first_calculation(double a, QVector<qint16> b)
 }
 
 
-QVector<double> WAV::predictCoder(QVector<int16_t>canal, QVector<double>vectorEPS) {
+QVector<double> WAV::predictCoder(QVector<qint16>canal, QVector<double>vectorEPS) {
     qreal sumPredict = 0;
     QVector <double> counters;
     QVector <double> predictValue;
@@ -635,7 +637,7 @@ qreal WAV::EntroBit(QVector<qint16>canal) {
 }
 
 
-bool WAV::decode(QVector<qreal> channel) {
+bool WAV::decode(QVector<qint16> channel) {
 
     qreal **pA, *pB, *X;
     int N = samples / 2;
@@ -662,8 +664,8 @@ bool WAV::decode(QVector<qreal> channel) {
             }
 
             if (j == 1)
-                p.assign(p_cnt);
-            x.assign(x_cnt);
+                p.append(p_cnt);
+            x.append(x_cnt);
             x_cnt = 0;
             p_cnt = 0;
         }
@@ -678,10 +680,10 @@ bool WAV::decode(QVector<qreal> channel) {
     }
 
     if (!ludist(n, pA) && !lusolve(n, pA, pB, X))
-        QDebug() << "D = 0";
+        qDebug() << "D = 0";
 
     for (int i = 0; i < r; i++)
-        eps.assign(X[i]);
+        eps.append(X[i]);
 
     for (int i = 0; i < n; i++)
         delete[] pA[i];
@@ -689,17 +691,17 @@ bool WAV::decode(QVector<qreal> channel) {
     delete[] pB;
     delete[] X;
 
-    vector <qreal> coder = counterRepeat(channel, eps);
-    vector <qreal> decoded;
+    QVector <qreal> coder = predictCoder(channel,eps);
+    QVector <qreal> decoded;
     qreal predict = 0;
-    vector <qreal> value;
+    QVector <qreal> value;
 
     for (size_t i = 0; i < samples / 2; i++) {
         predict = 0;
         if (i == 0)
-            value.assign(channel.at(i));
+            value.append(channel.at(i));
         else if (i <= r)
-            value.assign(channel.at(i - 1));
+            value.append(channel.at(i - 1));
         else {
             for (size_t j = 1; j <= r; j++)
                 predict += eps.at(j - 1) * channel.at(i - j);
@@ -707,19 +709,19 @@ bool WAV::decode(QVector<qreal> channel) {
                 predict = 32768 - 1;
             else if (predict < -32768)
                 predict = -32768;
-            value.assign(floor(predict + 0.5));
+            value.append(floor(predict + 0.5));
         }
     }
 
     for (int i = 0; i < samples / 2; i++) {
         if(i == 0)
-            decoded.assign(coder.at(i));
+            decoded.append(coder.at(i));
         else
-            decoded.assign(coder.at(i) + value.at(i));
+            decoded.append(coder.at(i) + value.at(i));
     }
 
     for (int i = 0; i < 5; i++)
-        cout << decoded.at(i) << endl;
+        qDebug() << decoded.at(i);
 
     return true;
 }
