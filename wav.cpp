@@ -633,3 +633,93 @@ qreal WAV::EntroBit(QVector<qint16>canal) {
 
     return diagramBit;
 }
+
+
+bool WAV::decode(QVector<qreal> channel) {
+
+    qreal **pA, *pB, *X;
+    int N = samples / 2;
+
+    int n = r;
+    pA = new qreal *[n];
+    for (int i = 0; i < n; i++)
+        pA[i] = new qreal[n];
+    pB = new qreal[n];
+    X = new qreal[n];
+
+
+    qreal x_cnt = 0;
+    qreal p_cnt = 0;
+    QVector <qreal> x;
+    QVector <qreal> p;
+    QVector <qreal> eps;
+
+    for (int i = 1; i <= r; i++)
+        for (int j = 1; j <= r; j++) {
+            for (int z = r; z < N; z++) {
+                x_cnt += channel.at(z - i) * channel.at(z - j);
+                p_cnt += channel.at(z) * channel.at(z - i);
+            }
+
+            if (j == 1)
+                p.assign(p_cnt);
+            x.assign(x_cnt);
+            x_cnt = 0;
+            p_cnt = 0;
+        }
+
+    int cnt = 0;
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            pA[i][j] = x.at(cnt);
+            pB[i] = p.at(i);
+            cnt++;
+        }
+    }
+
+    if (!ludist(n, pA) && !lusolve(n, pA, pB, X))
+        QDebug() << "D = 0";
+
+    for (int i = 0; i < r; i++)
+        eps.assign(X[i]);
+
+    for (int i = 0; i < n; i++)
+        delete[] pA[i];
+    delete[] pA;
+    delete[] pB;
+    delete[] X;
+
+    vector <qreal> coder = counterRepeat(channel, eps);
+    vector <qreal> decoded;
+    qreal predict = 0;
+    vector <qreal> value;
+
+    for (size_t i = 0; i < samples / 2; i++) {
+        predict = 0;
+        if (i == 0)
+            value.assign(channel.at(i));
+        else if (i <= r)
+            value.assign(channel.at(i - 1));
+        else {
+            for (size_t j = 1; j <= r; j++)
+                predict += eps.at(j - 1) * channel.at(i - j);
+            if (predict > 32768 - 1)
+                predict = 32768 - 1;
+            else if (predict < -32768)
+                predict = -32768;
+            value.assign(floor(predict + 0.5));
+        }
+    }
+
+    for (int i = 0; i < samples / 2; i++) {
+        if(i == 0)
+            decoded.assign(coder.at(i));
+        else
+            decoded.assign(coder.at(i) + value.at(i));
+    }
+
+    for (int i = 0; i < 5; i++)
+        cout << decoded.at(i) << endl;
+
+    return true;
+}

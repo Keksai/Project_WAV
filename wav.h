@@ -34,7 +34,7 @@ public:
     double first_calculation(double a, QVector<qint16> b);
     void entropia();
 
-    QVector<double> predictCoder(QVector<int16_t> canal, QVector<double> vectorEPS);
+    QVector<double> predictCoder(QVector<qreal> canal, QVector<qreal> vectorEPS);
     void normal_vectors();
     void minus_vectors();
 
@@ -75,6 +75,8 @@ public:
 
     bool lusolve(int n, double ** A, double * B, double * X);
     bool ludist(int n, double ** A);
+
+    bool decode(QVector<qreal> channel);
 
     qint8 r;
 };
