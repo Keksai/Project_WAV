@@ -10,6 +10,13 @@ WAV::WAV(const QString fileName, qint8 r)
 {
     this->r = r;
     readWAV(fileName, r);
+
+   // normal_vectors(); // wektory wypelniane danymi
+
+    double d = ((first_calculation(samples / 2, LeftSamples) + first_calculation(samples / 2, RightSamples)) / 2);
+    qDebug() << "Av signal energy: " << d; // pierwsze obliczenia
+    minus_vectors();
+
 }
 
 void WAV::entropia() {
@@ -189,21 +196,35 @@ void WAV::readWAV(const QString fileName, qint8 r)
         /* SREDNIA KWADRATOWA Z SUMY KWADRATOW */
 
         /* TEST WARTOSCI */
-        for (int i=990;i <1000;i++) {
-            qDebug() << "Number: " << i
-                     << " counted: " << occurenceNumberLeft[i]
-                     <<" prob Lewy: "<< probabilitiesleft[i] // test wystapien
-                     <<" prob Prawy: "<< probabilitiesright[i];
-        }
+//        for (int i=990;i <1000;i++) {
+//            qDebug() << "Number: " << i
+//                     << " counted: " << occurenceNumberLeft[i]
+//                     <<" prob Lewy: "<< probabilitiesleft[i] // test wystapien
+//                     <<" prob Prawy: "<< probabilitiesright[i];
+//        }
 
 
-        qDebug() << "entropia L: " << entropiaL << "entropia R: " << entropiaR;
-        qDebug() << "Suma kwadratowa L: " << (double)powerSumLeft << "Suma kwadratowa R: " << (double)powerSumRight;
+//        qDebug() << "entropia L: " << entropiaL << "entropia R: " << entropiaR;
+   //     qDebug() << "Suma kwadratowa L: " << (double)powerSumLeft << "Suma kwadratowa R: " << (double)powerSumRight;
         //write();
 
         wavFile.close();
     }
 }
+
+double WAV::first_calculation(double a, QVector<qint16> b)
+{
+    double full = 0;
+    for (qint32 i = 0; i < a; i++)
+    {
+        full = (double)(full + (((double)b.at(i) * (double)b.at(i))));
+    }
+
+    full = full / a;
+
+    return full;
+}
+
 
 QVector<double> WAV::predictCoder(QVector<int16_t>canal, QVector<double>vectorEPS) {
     qreal sumPredict = 0;
@@ -235,8 +256,38 @@ QVector<double> WAV::predictCoder(QVector<int16_t>canal, QVector<double>vectorEP
             counters.append(canal.at(i) - predictValue.at(i));
     }
 
+    for (int i = 0; i = 10; i ++)
+        qDebug() << counters[i];
     return counters;
 }
+
+
+void WAV::minus_vectors()
+{
+    for (int i = 0; i < LeftSamples.size(); i++)
+    {
+        if (i == 0)
+        {
+            LeftSamples_remove.append(LeftSamples.at(i));
+        }
+        else
+        {
+            LeftSamples_remove.append(LeftSamples.at(i) - LeftSamples.at(i - 1));
+        }
+    }
+    for (int i = 0; i < RightSamples.size(); i++)
+    {
+        if (i == 0)
+        {
+            RightSamples_remove.append(RightSamples.at(i));
+        }
+        else
+        {
+            RightSamples_remove.append(RightSamples.at(i) - RightSamples.at(i - 1));
+        }
+    }
+}
+
 
 qreal WAV::SystemOfEquations(QVector<qint16>canal) {
     double **A, *B, *X;
@@ -481,3 +532,104 @@ bool WAV::sign(double a) {
         return 0;
 }
 
+
+
+qreal WAV::EntroBit(QVector<qint16>canal) {
+
+    double **A, *B, *X;
+    int n = r;
+    int N = samples / 2;
+
+   // qDebug() << setprecision(10) << fixed;
+    A = new double *[n];
+    B = new double[n];
+    X = new double[n];
+
+    for (int i = 0; i < n; i++)
+        A[i] = new double[n];
+
+    double sumX = 0;
+    double sumP = 0;
+    QVector<double>matrixX;
+    QVector<double>matrixP;
+    QVector<double>vectorEPS;
+
+    for (int i = 1; i <= r; i++) {
+        for (int j = 1; j <= r; j++) {
+            for (int z = r ; z < N ; z++) {
+                sumX += canal.at(z - i) * canal.at(z - j);
+                sumP += canal.at(z) * canal.at(z - i);
+            }
+
+            if (j == 1)
+                matrixP.append(sumP);
+            matrixX.append(sumX);
+            sumX = 0;
+            sumP = 0;
+        }
+    }
+
+    int counterVector = 0;
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            A[i][j] = matrixX.at(counterVector);
+            counterVector++;
+            B[i] = matrixP.at(i);
+        }
+    }
+
+    if (ludist(n, A) && lusolve(n, A, B, X)) {}
+    else qDebug() << "DZIELNIK ZERO\n";
+
+    for (int i = 0; i < r; i++)
+        vectorEPS.append(X[i]);
+
+    for (int i = 0; i < n; i++)
+        delete[] A[i];
+    delete[] A;
+    delete[] B;
+    delete[] X;
+
+   double max = *std::max_element(vectorEPS.constBegin(), vectorEPS.constEnd());
+   double min = *std::min_element(vectorEPS.constBegin(), vectorEPS.constEnd());
+
+    if (abs(min) > max)
+        max = abs(min);
+    max = float(max);
+
+    QVector<int>si;
+    QVector<double>scale;
+    QVector<double>descale;
+    QVector<double> counters;
+
+    double Lsr;
+   // double entropia = 0;
+    double minLsr = 100;
+    int diagramBit = 0;
+    for (int b = 5; b <= 16; b++) {
+
+        for (int i = 0; i < r; i++) {
+            scale.append(floor(abs(vectorEPS.at(i)) / (max) * (pow(2, b) - 1) + 0.5));
+            si.append(sign(vectorEPS.at(i)));
+        }
+
+        for (int i = 0; i < r; i++)
+            descale.append(((scale.at(i) / (pow(2, b) - 1)) * (max)) * (si.at(i) * 2 - 1));
+
+        counters = predictCoder(canal, descale);
+        Lsr = entro_minus(counters) + ((32 + (r - 1) * (b + 1) + 10) / samples);
+
+        if (minLsr > Lsr) {
+            minLsr = Lsr;
+            diagramBit = b;
+        }
+
+        si.clear();
+        scale.clear();
+        descale.clear();
+        counters.clear();
+    }
+    minLsrVector.append(minLsr);
+
+    return diagramBit;
+}

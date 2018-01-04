@@ -31,13 +31,16 @@ public:
     WAV(const QString fileName, qint8 r);
 
     void readWAV(const QString fileName, qint8 r);
+    double first_calculation(double a, QVector<qint16> b);
     void entropia();
 
     QVector<double> predictCoder(QVector<int16_t> canal, QVector<double> vectorEPS);
     void normal_vectors();
+    void minus_vectors();
 
     qreal SystemOfEquations(QVector<qint16>canal);
     qreal divideEPS (QVector<qint16>canal);
+    qreal EntroBit(QVector<qint16>canal);
 
 
     quint32 occurenceNumberRight[65536];
@@ -50,6 +53,7 @@ public:
     double entropiaR;
 
     int samples;
+    QVector<double> minLsrVector;
 
     double probabilitiesleft[65536];
     double probabilitiesMinusleft[65536];
@@ -59,8 +63,11 @@ public:
 
     wav_header_t wavHeader;
 
-    QVector<int> LeftSamples;
-    QVector<int> RightSamples;
+    QVector<qint16> LeftSamples;
+    QVector<qint16> RightSamples;
+
+    QVector<qreal> LeftSamples_remove;
+    QVector<qreal> RightSamples_remove;
 
     qreal entro_minus(QVector<double> a);
     bool sign(double a);
