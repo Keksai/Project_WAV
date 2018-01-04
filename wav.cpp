@@ -1,5 +1,7 @@
 #include "wav.h"
 #include <QtMath>
+#include <algorithm>
+#include <iomanip>
 
 
 WAV::WAV() {}
@@ -203,7 +205,6 @@ void WAV::readWAV(const QString fileName, qint8 r)
     }
 }
 
-
 QVector<double> WAV::predictCoder(QVector<int16_t>canal, QVector<double>vectorEPS) {
     qreal sumPredict = 0;
     QVector <double> counters;
@@ -235,5 +236,248 @@ QVector<double> WAV::predictCoder(QVector<int16_t>canal, QVector<double>vectorEP
     }
 
     return counters;
+}
+
+qreal WAV::SystemOfEquations(QVector<qint16>canal) {
+    double **A, *B, *X;
+    int n = r;
+
+   // qDebug() << QString::number( fixed, 'f', 10 );
+    A = new double *[n];
+    B = new double[n];
+    X = new double[n];
+
+    for (int i = 0; i < n; i++)
+        A[i] = new double[n];
+
+    int N = samples / 2;
+    double sumX = 0;
+    double sumP = 0;
+    QVector<double>matrixX;
+    QVector<double>matrixP;
+    QVector<double> vectorEPS;
+
+    for (int i = 1; i <= r; i++) {
+        for (int j = 1; j <= r; j++) {
+            for (int z = r; z < N; z++) {
+                sumX += canal.at(z - i) * canal.at(z - j);
+                sumP += canal.at(z) * canal.at(z - i);
+            }
+
+            if (j == 1)
+                matrixP.append(sumP);
+            matrixX.append(sumX);
+            sumX = 0;
+            sumP = 0;
+        }
+    }
+
+    int counterVector = 0;
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            A[i][j] = matrixX.at(counterVector);
+            counterVector++;
+            B[i] = matrixP.at(i);
+        }
+    }
+
+    if (ludist(n, A) && lusolve(n, A, B, X)) {}
+    else qDebug() << "DZIELNIK ZERO\n";
+
+    for (int i = 0; i < r; i++)
+        vectorEPS.append(X[i]);
+
+    QVector<double> counters;
+    counters = predictCoder(canal, vectorEPS);
+    qreal returnEntropia = entro_minus(counters);
+
+    for (int i = 0; i < n; i++)
+        delete[] A[i];
+    delete[] A;
+    delete[] B;
+    delete[] X;
+
+    return returnEntropia;
+}
+
+
+qreal WAV::divideEPS (QVector<qint16>canal) {
+
+    QVector<int>si;
+    QVector<double>scale;
+    QVector<double>descale;
+    QVector<double>matrixX;
+    QVector<double>matrixP;
+    QVector<double>vectorEPS;
+    QVector<double>counters;
+
+    int b = 12;
+    int k = 120 / r;
+    int N = (samples / 2) - (k - 1) * ceil((samples / 2) / k);
+    qreal minLsr = 100;
+    double Lsr;
+
+    for (int p = 1; p <= k; p++) {
+        double **A, *B, *X;
+        int n = r;
+
+       // qDebug() << QString::number( fixed, 'f', 10 );
+        A = new double *[n];
+        B = new double[n];
+        X = new double[n];
+
+        for (int i = 0; i < n; i++)
+            A[i] = new double[n];
+
+        double sumX = 0;
+        double sumP = 0;
+
+        for (int i = 1; i <= r; i++) {
+            for (int j = 1; j <= r; j++) {
+                for (int z = r + (N * p - N); z < N * p; z++) {
+                    sumX += canal.at(z - i) * canal.at(z - j);
+                    sumP += canal.at(z) * canal.at(z - i);
+                }
+
+                if (j == 1)
+                    matrixP.append(sumP);
+                matrixX.append(sumX);
+                sumX = 0;
+                sumP = 0;
+            }
+        }
+
+        int counterVector = 0;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                A[i][j] = matrixX.at(counterVector);
+                counterVector++;
+                B[i] = matrixP.at(i);
+            }
+        }
+
+        if (ludist(n, A) && lusolve(n, A, B, X)) {}
+        else qDebug() << "DZIELNIK ZERO\n";
+
+        for (int i = 0; i < r; i++)
+            vectorEPS.append(X[i]);
+
+        for (int i = 0; i < n; i++)
+            delete[] A[i];
+        delete[] A;
+        delete[] B;
+        delete[] X;
+
+        double max = *std::max_element(vectorEPS.constBegin(), vectorEPS.constEnd());
+        double min = *std::min_element(vectorEPS.constBegin(), vectorEPS.constEnd());
+
+        if (abs(min) > max)
+            max = abs(min);
+        max = float(max);
+
+        for (int i = 0; i < r; i++) {
+            scale.append(floor(abs(vectorEPS.at(i)) / (max) * (pow(2, b) - 1) + 0.5));
+            si.append(sign(vectorEPS.at(i)));
+        }
+
+        for (int i = 0; i < r; i++)
+            descale.append(((scale.at(i) / (pow(2, b) - 1)) * (max)) * (si.at(i) * 2 - 1));
+
+        counters = predictCoder(canal, descale);
+        Lsr = entro_minus(counters) + ((32 + (r - 1) * (b + 1) + 10) / samples);
+
+        if (minLsr > Lsr)
+            minLsr = Lsr;
+
+        si.clear();
+        scale.clear();
+        descale.clear();
+        vectorEPS.clear();
+        counters.clear();
+    }
+
+    return minLsr;
+}
+
+qreal WAV::entro_minus(QVector<double> a)
+{
+    qreal entro = 0;
+    QVector <qreal> buffor(131072);
+    for (int i = 0; i < a.size(); i++)
+    {
+        buffor[(static_cast<int>(a.at(i)) + 65536)] += 1;
+    }
+    for (int i = 0; i < 131072; i++)
+    {
+        if (buffor.at(i) != 0)
+        {
+            double p_i = (double)buffor.at(i) / a.size();
+            entro = entro + (p_i*log2(p_i));
+        }
+    }
+    return entro *(-1);
+}
+
+bool WAV::ludist(int n, double ** A)
+{
+    const double eps = 1e-12;
+    int i, j, k;
+
+    for (k = 0; k < n - 1; k++)
+    {
+        if (fabs(A[k][k]) < eps) return false;
+
+        for (i = k + 1; i < n; i++)
+            A[i][k] /= A[k][k];
+
+        for (i = k + 1; i < n; i++)
+            for (j = k + 1; j < n; j++)
+                A[i][j] -= A[i][k] * A[k][j];
+    }
+
+    return true;
+}
+
+bool WAV::lusolve(int n, double ** A, double * B, double * X)
+{
+    int    i, j;
+    double s;
+    const double eps = 1e-12;
+
+    X[0] = B[0];
+
+    for (i = 1; i < n; i++)
+    {
+        s = 0;
+
+        for (j = 0; j < i; j++) s += A[i][j] * X[j];
+
+        X[i] = B[i] - s;
+    }
+
+    if (fabs(A[n - 1][n - 1]) < eps) return false;
+
+    X[n - 1] /= A[n - 1][n - 1];
+
+    for (i = n - 2; i >= 0; i--)
+    {
+        s = 0;
+
+        for (j = i + 1; j < n; j++) s += A[i][j] * X[j];
+
+        if (fabs(A[i][i]) < eps) return false;
+
+        X[i] = (X[i] - s) / A[i][i];
+    }
+
+    return true;
+}
+
+
+bool WAV::sign(double a) {
+    if (a >= 0)
+        return 1;
+    else
+        return 0;
 }
 
