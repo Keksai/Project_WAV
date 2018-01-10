@@ -16,7 +16,9 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += main.cpp \
     temp.cpp \
-    wav.cpp
+    wav.cpp \
+    wavchannel.cpp
 
 HEADERS += \
-    wav.h
+    wav.h \
+    wavchannel.h

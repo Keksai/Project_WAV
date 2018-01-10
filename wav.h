@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QDataStream>
 #include <cmath>
+#include "wavchannel.h"
 
 struct wav_header_t
 {
@@ -30,24 +31,24 @@ public:
     WAV();
     WAV(const QString fileName, qint8 r);
 
-    void readWAV(const QString fileName, qint8 r);
+
+    void readWAV(const QString fileName);
     double first_calculation(double a, QVector<qint16> b);
     void entropia();
 
-    QVector<double> predictCoder(QVector<qint16> canal, QVector<qreal> vectorEPS);
-    void normal_vectors();
+    QVector<double> predictStyleCoding(QVector<qint16> canal, QVector<qreal> vectorEPS);
+    void differentialStyleCoding();
+
     void minus_vectors();
+
+
+    /* ********************* */
+    WAVChannel* left;
+    WAVChannel* right;
 
     qreal SystemOfEquations(QVector<qint16>canal);
     qreal divideEPS (QVector<qint16>canal);
-    qreal EntroBit(QVector<qint16>canal);
-
-
-    quint32 occurenceNumberRight[65536];
-    quint32 occurenceNumberMinusRight[65536];
-
-    quint32 occurenceNumberLeft[65536];
-    quint32 occurenceNumberMinusLeft[65536];
+    qreal partOne();
 
     double entropiaL;
     double entropiaR;
@@ -55,20 +56,9 @@ public:
     int samples;
     QVector<double> minLsrVector;
 
-    double probabilitiesleft[65536];
-    double probabilitiesMinusleft[65536];
-
-    double probabilitiesright[65536];
-    double probabilitiesMinusright[65536];
-
     wav_header_t wavHeader;
 
-    QVector<qint16> LeftSamples;
-    QVector<qint16> RightSamples;
-
-    QVector<qreal> LeftSamples_remove;
-    QVector<qreal> RightSamples_remove;
-
+    qreal EntroBit(QVector<qint16>canal);
     qreal entro_minus(QVector<double> a);
     bool sign(double a);
 
@@ -79,6 +69,9 @@ public:
     bool decode(QVector<qint16> channel);
 
     qint8 r;
+    qreal avLsr;
+
+     void pureCoperfieldMagic();
 };
 
 #endif // WAV_H
